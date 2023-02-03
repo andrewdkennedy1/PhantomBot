@@ -1,3 +1,5 @@
+//needs this in the response for channel redeems to function: 
+//(cpdisplayname) redeemed (cptitle) (count 1 (cpuserid)+(cptitle)) times!
 $.bind("command", function (event) {
   var command = event.getCommand(),
     args = event.getArgs(),
