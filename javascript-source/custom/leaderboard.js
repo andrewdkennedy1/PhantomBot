@@ -1,53 +1,54 @@
-//needs this in the response for channel redeems to function: 
-//(cpdisplayname) redeemed (cptitle) (count 1 (cpuserid)+(cptitle)) times!
+//need this in channelpoints redeem response to work `(cpdisplayname) redeemed (cptitle) (count 1 (cpuserid)+(cpdisplayname)+(cptitle)) times!` 
 $.bind("command", function (event) {
-  var command = event.getCommand(),
-    args = event.getArgs(),
-    sender = event.getSender(),
-    arg = args[0];
+  var command = event.getCommand().toLowerCase();
+  var args = event.getArgs();
+  var redeemTitle = args[0];
+
   if (command.equalsIgnoreCase("leaderboard")) {
-    com.gmt2001.Console.out.println(
-      "the command was used by " + sender + " with the argument " + arg
-    );
     var keys = $.inidb
       .GetKeysByOrderValue("commandCount")
-      .filter((key) => /^\d/.test(key));
+      .filter(function (key) {
+        return /^\d/.test(key);
+      });
     if (!keys.length) return;
-    var data = keys.map((key) => {
-      var value = $.inidb.get("commandCount", key);
-      var [userId, redeemTitle] = key.split("\\+");
-      return [userId, redeemTitle, value];
-    });
-    if (!arg) {
-      var msg = "Top 3 most redeemed: ";
-      for (var i = 0; i < 3; i++) {
-        var userData = com.gmt2001.TwitchAPIv5.instance().GetUserByID(
-          data[i][0]
-        );
-        var name = userData.getString("display_name");
-        msg += `${data[i][1]} by ${name} with ${data[i][2]} | `;
-      }
 
-      $.say(msg);
-    } else {
-      var filteredData = data.filter((entry) =>
-        entry[1].toLowerCase().includes(arg.toLowerCase())
-      );
-      if (!filteredData.length)
-        return $.say(arg + " is not a valid redeem title.");
-      var matchedRedeemTitle = filteredData[0][1];
-      var msg = "Top 3 redeemers for " + matchedRedeemTitle + ": ";
-      for (var i = 0; i < Math.min(3, filteredData.length); i++) {
-        var userData = com.gmt2001.TwitchAPIv5.instance().GetUserByID(
-          filteredData[i][0]
-        );
-        var name = userData.getString("display_name");
-        msg += `${name} with ${data[i][2]} | `;
+    var data = keys.map(function (key) {
+      var value = $.inidb.get("commandCount", key);
+      var keyParts = key.split("\\+");
+      var userId = keyParts[0];
+      var displayName = keyParts[1];
+      var title = keyParts[2];
+      return { userId, displayName, title, value };
+    });
+
+    var sortedData = data.sort(function (a, b) {
+      return b.value - a.value;
+    });
+
+    var filteredData;
+    if (redeemTitle) {
+      filteredData = sortedData.filter(function (entry) {
+        return entry.title.toLowerCase().includes(redeemTitle.toLowerCase());
+      });
+      if (!filteredData.length) {
+        return $.say(redeemTitle + " is not a valid redeem title.");
       }
-      $.say(msg);
+    } else {
+      filteredData = sortedData;
     }
+
+    var message = filteredData
+      .slice(0, 3)
+      .map(function (entry) {
+        return redeemTitle ? 
+          entry.displayName + " - " + entry.value :
+          entry.displayName + " (" + entry.title + ") - " + entry.value;
+      })
+      .join(" | ");
+    $.say(message);
   }
 });
+
 $.bind("initReady", function () {
   $.registerChatCommand("./custom/leaderboard.js", "leaderboard", 7);
 });
