@@ -44,23 +44,23 @@ def parse_file(fpath, lines):
                 cmd_pos = line.find(" ")
                 if cmd_pos == -1:
                     cmd_pos = len(line)
-                cmd = line[0:cmd_pos].strip()
+                cmd = line[:cmd_pos].strip()
                 commands.append({"command": cmd, "definition": line, "source": fpath})
 
 def output_command(command, hlevel):
-    lines = []
     h = "#"
     while len(h) < hlevel:
-        h = h + "#"
-    lines.append(h + " " + command["command"] + '\n')
-    lines.append('\n')
-    lines.append("Defined in source file: _" + command["source"] + "_" + '\n')
-    lines.append('\n')
-    lines.append(command["definition"] + '\n')
-    lines.append('\n')
-    lines.append("&nbsp;" + '\n')
-    lines.append('\n')
-    return lines
+        h += "#"
+    return [
+        f"{h} " + command["command"] + '\n',
+        '\n',
+        "Defined in source file: _" + command["source"] + "_" + '\n',
+        '\n',
+        command["definition"] + '\n',
+        '\n',
+        "&nbsp;" + '\n',
+        '\n',
+    ]
 
 for subdir, dirs, files in os.walk("./source"):
     for fname in files:
@@ -69,24 +69,27 @@ for subdir, dirs, files in os.walk("./source"):
             with open(fpath, encoding="utf8") as java_file:
                 parse_file(fpath, [line.rstrip('\n') for line in java_file])
 
-lines = []
-
-lines.append("## Console Commands" + '\n')
-lines.append('\n')
-lines.append("**These console commands are available directly in the bot console when not running as a service.**" + '\n')
-lines.append('\n')
-lines.append("&nbsp;" + '\n')
-lines.append('\n')
-lines.append("<!-- toc -->" + '\n')
-lines.append('\n')
-lines.append("<!-- tocstop -->" + '\n')
-lines.append('\n')
-lines.append("&nbsp;" + '\n')
-lines.append('\n')
-lines.append("Parameters enclosed in square brackets `[ ]` are required when using the command" + '\n')
-lines.append('\n')
-lines.append("Parameters enclosed in parenthesis `( )` are optional when using the command" + '\n')
-lines.append('\n')
+lines = [
+    "## Console Commands" + '\n',
+    '\n',
+    "**These console commands are available directly in the bot console when not running as a service.**"
+    + '\n',
+    '\n',
+    "&nbsp;" + '\n',
+    '\n',
+    "<!-- toc -->" + '\n',
+    '\n',
+    "<!-- tocstop -->" + '\n',
+    '\n',
+    "&nbsp;" + '\n',
+    '\n',
+    "Parameters enclosed in square brackets `[ ]` are required when using the command"
+    + '\n',
+    '\n',
+    "Parameters enclosed in parenthesis `( )` are optional when using the command"
+    + '\n',
+    '\n',
+]
 
 for command in commands:
     lines.extend(output_command(command, 3))

@@ -51,29 +51,28 @@ gtransformers = []
 ltransformers = {}
 usestransformers = []
 
-transformer_template = {}
-transformer_template["script"] = ""
-transformer_template["category"] = ""
-transformer_template["function"] = ""
-transformer_template["formulas"] = []
-transformer_template["labels"] = ""
-transformer_template["customArgs"] = []
-transformer_template["notes"] = []
-transformer_template["examples"] = []
-transformer_template["raw"] = False
-transformer_template["rawSometimes"] = False
-transformer_template["cached"] = False
-transformer_template["cancels"] = False
-transformer_template["cancelsSometimes"] = False
-
-usestransformers_template = {}
-usestransformers_template["script"] = ""
-usestransformers_template["hooks"] = []
-usestransformers_hook_template = {}
-usestransformers_hook_template["hook"] = ""
-usestransformers_hook_template["global"] = False
-usestransformers_hook_template["local"] = False
-usestransformers_hook_template["labels"] = ""
+transformer_template = {
+    "script": "",
+    "category": "",
+    "function": "",
+    "formulas": [],
+    "labels": "",
+    "customArgs": [],
+    "notes": [],
+    "examples": [],
+    "raw": False,
+    "rawSometimes": False,
+    "cached": False,
+    "cancels": False,
+    "cancelsSometimes": False,
+}
+usestransformers_template = {"script": "", "hooks": []}
+usestransformers_hook_template = {
+    "hook": "",
+    "global": False,
+    "local": False,
+    "labels": "",
+}
 
 # States
 # 0 = Outside multi-line comment block
@@ -99,14 +98,14 @@ def parse_file(fpath, lines):
         if line == "/*" and state == 0:
             state = 1
         if line == "*/" and state > 0:
-            if state == 3 or state == 6:
+            if state in [3, 6]:
                 transformer["notes"].append(note)
-            if state == 4 or state == 7:
+            if state in [4, 7]:
                 transformer["examples"].append(example)
             if state >= 2 and state <= 4:
                 gtransformers.append(transformer)
             if state >= 5 and state <= 7:
-                if not transformer["script"] in ltransformers:
+                if transformer["script"] not in ltransformers:
                     ltransformers[transformer["script"]] = []
                 ltransformers[transformer["script"]].append(transformer)
             if state < 8:
@@ -144,25 +143,18 @@ def parse_file(fpath, lines):
                 usestransformer_hook["labels"] = line.removeprefix("@usestransformers").strip().removeprefix("global").strip().removeprefix("local").strip().removeprefix("global").strip()
             if state > 1:
                 if state != 2 and state != 5 and line.startswith("@"):
-                    if state == 3 or state == 6:
+                    if state in [3, 6]:
                         state = state - 1
                         transformer["notes"].append(note)
-                    if state == 4 or state == 7:
+                    if state in [4, 7]:
                         state = state - 2
                         transformer["examples"].append(example)
                 if line.startswith("@formula"):
                     line = line[9:].strip()
                     desc_pos = line.find(") ")
-                    if desc_pos == -1:
-                        desc_pos = len(line)
-                    else:
-                        desc_pos = desc_pos + 1
-                    formula = {}
-                    formula["formula"] = line[0:desc_pos].strip()
-                    if desc_pos < len(line):
-                        formula["desc"] = line[desc_pos:].strip()
-                    else:
-                        formula["desc"] = ""
+                    desc_pos = len(line) if desc_pos == -1 else desc_pos + 1
+                    formula = {"formula": line[:desc_pos].strip()}
+                    formula["desc"] = line[desc_pos:].strip() if desc_pos < len(line) else ""
                     transformer["formulas"].append(formula)
                 if line.startswith("@labels"):
                     transformer["labels"] = line.removeprefix("@labels").strip()
@@ -171,28 +163,21 @@ def parse_file(fpath, lines):
                 if line.startswith("@customarg"):
                     line = line[11:].strip()
                     desc_pos = line.find(") ")
-                    if desc_pos == -1:
-                        desc_pos = len(line)
-                    else:
-                        desc_pos = desc_pos + 1
-                    customarg = {}
-                    customarg["arg"] = line[0:desc_pos].strip()
-                    if desc_pos < len(line):
-                        customarg["desc"] = line[desc_pos:].strip()
-                    else:
-                        customarg["desc"] = ""
+                    desc_pos = len(line) if desc_pos == -1 else desc_pos + 1
+                    customarg = {"arg": line[:desc_pos].strip()}
+                    customarg["desc"] = line[desc_pos:].strip() if desc_pos < len(line) else ""
                     transformer["customArgs"].append(customarg)
                 if line.startswith("@notes"):
                     state = state + 1
                     line = line[7:].strip()
                     note = []
-                if state == 3 or state == 6:
+                if state in [3, 6]:
                     note.append(line)
                 if line.startswith("@example"):
                     state = state + 2
                     line = line[9:].strip()
                     example = []
-                if state == 4 or state == 7:
+                if state in [4, 7]:
                     example.append(line)
                 if line.startswith("@raw"):
                     transformer["raw"] = True
@@ -219,33 +204,34 @@ def output_transformer(transformer, hlevel, currentcategory=None):
     lines = []
     h = "#"
     while len(h) < hlevel:
-        h = h + "#"
+        h += "#"
     if currentcategory != None:
         if currentcategory != transformer["category"]:
-            lines.append(h + " " + transformer["category"] + '\n')
-        h = h + "#"
-    lines.append(h + " " + transformer["function"] + '\n')
-    lines.append('\n')
-    lines.append("Defined in script: _" + transformer["script"] + "_" + '\n')
-    lines.append('\n')
-    lines.append("**Formulas:**" + '\n')
-    lines.append('\n')
+            lines.append(f"{h} " + transformer["category"] + '\n')
+        h += "#"
+    lines.extend(
+        (
+            f"{h} " + transformer["function"] + '\n',
+            '\n',
+            "Defined in script: _" + transformer["script"] + "_" + '\n',
+            '\n',
+            "**Formulas:**" + '\n',
+            '\n',
+        )
+    )
     for formula in transformer["formulas"]:
         line = "- `" + formula["formula"] + "`"
         if len(formula["desc"]) > 0:
-            line = line + " - " + formula["desc"]
+            line = f"{line} - " + formula["desc"]
         lines.append(line + '\n')
     if len(transformer["labels"]) > 0:
-        lines.append('\n')
-        lines.append("**Labels:** " + transformer["labels"] + '\n')
+        lines.extend(('\n', "**Labels:** " + transformer["labels"] + '\n'))
     if len(transformer["customArgs"]) > 0:
-        lines.append('\n')
-        lines.append("**Custom Arguments:**" + '\n')
-        lines.append('\n')
+        lines.extend(('\n', "**Custom Arguments:**" + '\n', '\n'))
         for customarg in transformer["customArgs"]:
             line = "- `" + customarg["arg"] + "`"
             if len(customarg["desc"]) > 0:
-                line = line + " - " + customarg["desc"]
+                line = f"{line} - " + customarg["desc"]
             lines.append(line + '\n')
     if len(transformer["notes"]) > 0:
         lines.append('\n')
@@ -255,81 +241,67 @@ def output_transformer(transformer, hlevel, currentcategory=None):
             for nline in note:
                 if first:
                     first = False
-                    lines.append("_NOTE: " + nline + "_" + '\n')
+                    lines.append(f"_NOTE: {nline}_" + '\n')
                 else:
-                    lines.append('\n')
-                    lines.append("_" + nline + "_" + '\n')
+                    lines.extend(('\n', f"_{nline}_" + '\n'))
     if len(transformer["examples"]) > 0:
         lines.append('\n')
         for example in transformer["examples"]:
-            lines.append('\n')
-            lines.append("**Example:**" + '\n')
-            lines.append("```text" + '\n')
-            for eline in example:
-                lines.append(eline + '\n')
+            lines.extend(('\n', "**Example:**" + '\n', "```text" + '\n'))
+            lines.extend(eline + '\n' for eline in example)
             lines.append("```" + '\n')
-    lines.append('\n')
-    lines.append('Raw?[^raw]&nbsp;&nbsp; | Cached?[^cached]&nbsp;&nbsp; | Cancels?[^cancels]\n')
-    lines.append('-------|-----------|----------\n')
+    lines.extend(
+        (
+            '\n',
+            'Raw?[^raw]&nbsp;&nbsp; | Cached?[^cached]&nbsp;&nbsp; | Cancels?[^cancels]\n',
+            '-------|-----------|----------\n',
+        )
+    )
     line = ""
     if transformer["raw"]:
         if transformer["rawSometimes"]:
-            line = line + "Sometimes&nbsp;&nbsp; | "
+            line += "Sometimes&nbsp;&nbsp; | "
         else:
-            line = line + "Yes&nbsp;&nbsp; | "
+            line += "Yes&nbsp;&nbsp; | "
     else:
-        line = line + "No&nbsp;&nbsp; | "
-    if transformer["cached"]:
-        line = line + "Yes&nbsp;&nbsp; | "
-    else:
-        line = line + "No&nbsp;&nbsp; | "
+        line += "No&nbsp;&nbsp; | "
+    line += "Yes&nbsp;&nbsp; | " if transformer["cached"] else "No&nbsp;&nbsp; | "
     if transformer["cancels"]:
-        if transformer["cancelsSometimes"]:
-            line = line + "Sometimes"
-        else:
-            line = line + "Yes"
+        line += "Sometimes" if transformer["cancelsSometimes"] else "Yes"
     else:
-        line = line + "No"
-    lines.append(line + '\n')
-    lines.append('\n')
-    lines.append("&nbsp;" + '\n')
-    lines.append('\n')
+        line += "No"
+    lines.extend((line + '\n', '\n', "&nbsp;" + '\n', '\n'))
     return lines
 
 def output_usestransformer(usestransformer, hlevel):
-    lines = []
     h = "#"
-    discord = ""
     while len(h) < hlevel:
-        h = h + "#"
-    if "/discord/" in usestransformer["script"]:
-        discord = "discord / "
-    lines.append(h + " " + discord + usestransformer["script"][usestransformer["script"].rfind("/") + 1:] + '\n')
-    lines.append('\n')
-    lines.append("Defined in script: _" + usestransformer["script"] + "_" + '\n')
-    h = h + "#"
+        h += "#"
+    discord = "discord / " if "/discord/" in usestransformer["script"] else ""
+    lines = [
+        f"{h} {discord}"
+        + usestransformer["script"][usestransformer["script"].rfind("/") + 1 :]
+        + '\n',
+        '\n',
+        "Defined in script: _" + usestransformer["script"] + "_" + '\n',
+    ]
+    h += "#"
     for hook in usestransformer["hooks"]:
-        lines.append('\n')
-        lines.append(h + " Hook: " + hook["hook"] + '\n')
-        lines.append('\n')
-        lines.append('Global&nbsp;&nbsp; | Local\n')
-        lines.append('-------|-------\n')
-        line = ""
-        if hook["global"]:
-            line = line + "Yes&nbsp;&nbsp; | "
-        else:
-            line = line + "No&nbsp;&nbsp; | "
-        if hook["local"]:
-            line = line + "Yes"
-        else:
-            line = line + "No"
+        lines.extend(
+            (
+                '\n',
+                f"{h} Hook: " + hook["hook"] + '\n',
+                '\n',
+                'Global&nbsp;&nbsp; | Local\n',
+                '-------|-------\n',
+            )
+        )
+        line = "" + ("Yes&nbsp;&nbsp; | " if hook["global"] else "No&nbsp;&nbsp; | ")
+        line += "Yes" if hook["local"] else "No"
         lines.append(line + '\n')
         if len(hook["labels"]) > 0:
-            lines.append('\n')
-            lines.append("**Labels Used:** " + hook["labels"] + '\n')
-    lines.append('\n')
-    lines.append("&nbsp;" + '\n')
-    lines.append('\n')
+            lines.extend(('\n', "**Labels Used:** " + hook["labels"] + '\n'))
+    lines.extend(('\n', "&nbsp;" + '\n', '\n'))
     return lines
 
 for subdir, dirs, files in os.walk("./javascript-source"):

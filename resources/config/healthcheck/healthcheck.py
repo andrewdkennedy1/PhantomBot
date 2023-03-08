@@ -63,24 +63,20 @@ def getscriptdir():
     filename = getframeinfo(currentframe()).filename
     path = os.path.dirname(os.path.abspath(filename))
     if not path.endswith("/"):
-        path = path + "/"
+        path = f"{path}/"
     return path
 
 
 def getconfigdir(args):
-    if not args.config_dir:
-        if not args.is_docker:
-            path = getscriptdir()
-            path = path + "../"
-        else:
-            path = "/opt/PhantomBot_data/config/"
+    if args.config_dir:
+        path = args.config_dir if args.is_docker else os.path.abspath(args.config_dir)
+    elif not args.is_docker:
+        path = getscriptdir()
+        path = f"{path}../"
     else:
-        if not args.is_docker:
-            path = os.path.abspath(args.config_dir)
-        else:
-            path = args.config_dir
+        path = "/opt/PhantomBot_data/config/"
     if not path.endswith("/"):
-        path = path + "/"
+        path = f"{path}/"
     return path
 
 
@@ -127,18 +123,32 @@ def execfile(filepath, globals=None, locals=None):
 
 
 def getconfigfile(args):
-    if not args.is_docker:
-        if os.path.exists(getconfigdir(args) + "botlogin.txt"):
-                with open(getconfigdir(args) + "botlogin.txt") as bot_file:
-                    return bot_file.read().splitlines()
-        else:
-            dofailure(args, "noconfig", "Unable to find botlogin.txt")
-    else:
-        result = subprocess.run(["docker", "exec", "-it", args.service_name, "cat", getconfigdir(args) + "botlogin.txt"], capture_output=True)
+    if args.is_docker:
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-it",
+                args.service_name,
+                "cat",
+                f"{getconfigdir(args)}botlogin.txt",
+            ],
+            capture_output=True,
+        )
         if result.returncode != 0:
-            dofailure(args, "noconfig", "Unable to find botlogin.txt (" + result.returncode + ")")
+            dofailure(
+                args,
+                "noconfig",
+                f"Unable to find botlogin.txt ({result.returncode})",
+            )
         else:
             return result.stdout.splitlines()
+
+    elif os.path.exists(f"{getconfigdir(args)}botlogin.txt"):
+        with open(f"{getconfigdir(args)}botlogin.txt") as bot_file:
+            return bot_file.read().splitlines()
+    else:
+        dofailure(args, "noconfig", "Unable to find botlogin.txt")
 
 
 def main(args):
@@ -146,14 +156,8 @@ def main(args):
     try:
         if args.is_docker and not args.service_name:
             dofailure(args, "noservicename", "Set --is-docker but --service-name is missing or empty")
-        if args.use_https:
-            scheme = "https"
-        else:
-            scheme = "http"
-        if args.ip_hostname:
-            iphostname = args.ip_hostname
-        else:
-            iphostname = "127.0.0.1"
+        scheme = "https" if args.use_https else "http"
+        iphostname = args.ip_hostname or "127.0.0.1"
         port = 25000
         webauth = None
         lines = getconfigfile(args)
@@ -165,20 +169,45 @@ def main(args):
                 port = line.split("=", 1)[1]
         if webauth is None:
             dofailure(args, "noauth", "No webauth in botlogin.txt")
-        resp = requests.get(scheme + "://" + iphostname + ":" + port + "/presence", headers = { "User-Agent": "phantombot.healthcheck/2022" }, verify = False)
+        resp = requests.get(
+            f"{scheme}://{iphostname}:{port}/presence",
+            headers={"User-Agent": "phantombot.healthcheck/2022"},
+            verify=False,
+        )
         if resp.status_code != 200:
-            dofailure(args, "nopresencecode", "Presence check failed with HTTP " + resp.status_code)
+            dofailure(
+                args,
+                "nopresencecode",
+                f"Presence check failed with HTTP {resp.status_code}",
+            )
         elif resp.text.strip() != "PBok":
             dofailure(args, "nopresence", "Presence check returned an unknown response")
-        resp = requests.put(scheme + "://" + iphostname + ":" + port + "/dbquery", headers = { "User-Agent": "phantombot.healthcheck/2022", "webauth": webauth, "user": "healthcheck", "message": "!pbinternalping" }, verify = False)
+        resp = requests.put(
+            f"{scheme}://{iphostname}:{port}/dbquery",
+            headers={
+                "User-Agent": "phantombot.healthcheck/2022",
+                "webauth": webauth,
+                "user": "healthcheck",
+                "message": "!pbinternalping",
+            },
+            verify=False,
+        )
         if resp.status_code != 200:
-            dofailure(args, "noputcode", "Send PING failed with HTTP " + resp.status_code)
+            dofailure(args, "noputcode", f"Send PING failed with HTTP {resp.status_code}")
         elif resp.text.strip() != "event posted":
             dofailure(args, "noput", "Send PING returned an unknown response")
         time.sleep(5)
-        resp = requests.get(scheme + "://" + iphostname + ":" + port + "/addons/healthcheck.txt", headers = { "User-Agent": "phantombot.healthcheck/2022" }, verify = False)
+        resp = requests.get(
+            f"{scheme}://{iphostname}:{port}/addons/healthcheck.txt",
+            headers={"User-Agent": "phantombot.healthcheck/2022"},
+            verify=False,
+        )
         if resp.status_code != 200:
-            dofailure(args, "nohealthcheckcode", "Retrieve health check failed with HTTP " + resp.status_code)
+            dofailure(
+                args,
+                "nohealthcheckcode",
+                f"Retrieve health check failed with HTTP {resp.status_code}",
+            )
         try:
             lastaliveI = int(resp.text.strip())
         except:

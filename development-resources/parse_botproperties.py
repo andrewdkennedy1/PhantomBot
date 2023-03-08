@@ -89,9 +89,9 @@ def parse_file(lines):
                 prop_pos = line.find(" ")
                 if prop_pos == -1:
                     prop_pos = len(line)
-                prop = line[0:prop_pos].strip().lower()
+                prop = line[:prop_pos].strip().lower()
                 type = line[prop_pos + 1:].strip()
-                if not prop in ignoreproperties:
+                if prop not in ignoreproperties:
                     idx = findprop(prop)
                     if idx == -1:
                         botproperties.append({"botproperty": prop, "definition": "No definition", "type": type, "sort": 9999, "category": "Uncategorized", "category_sort": 9999, "restart": False})
@@ -100,7 +100,7 @@ def parse_file(lines):
             if line.startswith("@botpropertyrestart"):
                 line = line[20:].strip()
                 prop = line.lower()
-                if not prop in ignoreproperties:
+                if prop not in ignoreproperties:
                     idx = findprop(prop)
                     if idx == -1:
                         botproperties.append({"botproperty": prop, "definition": "No definition", "type": type, "sort": 9999, "category": "Uncategorized", "category_sort": 9999, "restart": True})
@@ -110,32 +110,26 @@ def parse_file(lines):
                 line = line[20:].strip()
                 prop_pos = line.find(" ")
                 if prop_pos >= 0:
-                    prop = line[0:prop_pos].strip().lower()
+                    prop = line[:prop_pos].strip().lower()
                     line = line[prop_pos + 1:].strip()
                     propSort_pos = line.find(" ")
                     if propSort_pos == -1:
-                        if len(line[0:].strip()) > 0:
-                            propSort = int(line[0:].strip())
-                        else:
-                            propSort = 9999
+                        propSort = int(line[:].strip()) if len(line[:].strip()) > 0 else 9999
                         catSort = 9999
                         catName = "Uncategorized"
                     else:
-                        propSort = int(line[0:propSort_pos].strip())
+                        propSort = int(line[:propSort_pos].strip())
                         line = line[propSort_pos + 1:].strip()
                         catSort_pos = line.find(" ")
                         if catSort_pos == -1:
-                            if len(line[0:].strip()) > 0:
-                                catSort = int(line[0:].strip())
-                            else:
-                                catSort = 9999
+                            catSort = int(line[:].strip()) if len(line[:].strip()) > 0 else 9999
                             catName = "Uncategorized"
                         else:
-                            catSort = int(line[0:catSort_pos].strip())
+                            catSort = int(line[:catSort_pos].strip())
                             catName = line[catSort_pos + 1:].strip()
                             if len(catName) == 0:
                                 catName = "Uncategorized"
-                    if not prop in ignoreproperties:
+                    if prop not in ignoreproperties:
                         idx = findprop(prop)
                         if idx == -1:
                             botproperties.append({"botproperty": prop, "definition": "No definition", "type": type, "sort": propSort, "category": catName, "category_sort": catSort, "restart": False})
@@ -148,15 +142,12 @@ def parse_file(lines):
                 prop_pos = line.find(" ")
                 if prop_pos == -1:
                     prop_pos = len(line)
-                prop = line[0:prop_pos].strip().lower()
+                prop = line[:prop_pos].strip().lower()
                 line = line[prop_pos:].strip()
                 propdef_pos = line.find("-")
-                if propdef_pos == -1:
-                    propdef_pos = 0
-                else:
-                    propdef_pos = propdef_pos + 1
+                propdef_pos = 0 if propdef_pos == -1 else propdef_pos + 1
                 propdef = line[propdef_pos:].strip().lower()
-                if not prop in ignoreproperties:
+                if prop not in ignoreproperties:
                     idx = findprop(prop)
                     if idx == -1:
                         botproperties.append({"botproperty": prop, "definition": propdef, "type": "String", "sort": 9999, "category": "Uncategorized", "category_sort": 9999, "restart": False})
@@ -168,15 +159,12 @@ def parse_file(lines):
             idx3 = line.find(")", idx2)
             line = line[idx:idx3]
             idx4 = line.find("(")
-            type = line[0:idx4]
-            if len(type) == 0:
-                type = "String"
-            else:
-                type = line[2:idx4]
+            type = line[:idx4]
+            type = "String" if len(type) == 0 else line[2:idx4]
             prop_pos = line.find("\"", idx4 + 2)
             if prop_pos != -1:
                 prop = line[idx4 + 2:prop_pos].strip().lower()
-                if not prop in ignoreproperties:
+                if prop not in ignoreproperties:
                     idx = findprop(prop)
                     if idx == -1:
                         botproperties.append({"botproperty": prop, "definition": "No definition", "type": type, "sort": 9999, "category": "Uncategorized", "category_sort": 9999, "restart": False})
@@ -184,40 +172,51 @@ def parse_file(lines):
                         botproperties[idx]["type"] = type
 
 def findprop(prop):
-    for i in range(len(botproperties)):
-        if botproperties[i]["botproperty"] == prop:
-            return i
-    return -1
+    return next(
+        (
+            i
+            for i in range(len(botproperties))
+            if botproperties[i]["botproperty"] == prop
+        ),
+        -1,
+    )
 
 def output_category(category, hlevel):
     h = "#"
     while len(h) < hlevel:
-        h = h + "#"
-    return [h + " " + category + '\n']
+        h += "#"
+    return [f"{h} {category}" + '\n']
 
 def output_botproperty(botproperty, hlevel):
-    lines = []
     h = "#"
     while len(h) < hlevel:
-        h = h + "#"
-    lines.append(h + " " + botproperty["botproperty"] + '\n')
-    lines.append('\n')
-    lines.append("Data Type: _" + botproperty["type"] + "_" + '\n')
-    lines.append('\n')
-    lines.append(botproperty["definition"] + '\n')
+        h += "#"
+    lines = [
+        f"{h} " + botproperty["botproperty"] + '\n',
+        '\n',
+        "Data Type: _" + botproperty["type"] + "_" + '\n',
+        '\n',
+        botproperty["definition"] + '\n',
+    ]
     if botproperty["restart"]: 
-        lines.append('\n')
-        lines.append('_NOTE: A restart is required for this property to take effect_\n')
-    lines.append('\n')
-    lines.append("&nbsp;" + '\n')
-    lines.append('\n')
+        lines.extend(
+            (
+                '\n',
+                '_NOTE: A restart is required for this property to take effect_\n',
+            )
+        )
+    lines.extend(('\n', "&nbsp;" + '\n', '\n'))
     return lines
 
 def sort():
     global botproperties
     categorysort = {}
     for botproperty in botproperties:
-        if not botproperty["category"] in categorysort or botproperty["category_sort"] < categorysort[botproperty["category"]]:
+        if (
+            botproperty["category"] not in categorysort
+            or botproperty["category_sort"]
+            < categorysort[botproperty["category"]]
+        ):
             categorysort[botproperty["category"]] = botproperty["category_sort"]
     for i in range(len(botproperties)):
         botproperties[i]["category_sort"] = categorysort[botproperties[i]["category"]]
@@ -230,30 +229,34 @@ for subdir, dirs, files in os.walk("./source"):
             with open(fpath, encoding="utf8") as java_file:
                 parse_file([line.rstrip('\n') for line in java_file])
 
-lines = []
-
-lines.append("## Bot Properties" + '\n')
-lines.append('\n')
-lines.append("**These properties can be defined in _botlogin.txt_**" + '\n')
-lines.append('\n')
-lines.append("Docker can also define them as ENV variables by converting to uppercase and adding the _PHANTOMBOT\__ prefix" + '\n')
-lines.append('\n')
-lines.append("NOTE: If the property exists in botlogin.txt, the ENV variable is ignored unless _PHANTOMBOT\_ENVOVERRIDE: \"true\"_ is set" + '\n')
-lines.append('\n')
-lines.append("NOTE: If the property does not list a default value, then the default value is not set/disabled" + '\n')
-lines.append('\n')
-lines.append('\n')
-lines.append("NOTE: _botlogin.txt_ can **not** be edited while the bot is running" + '\n')
-lines.append('\n')
-lines.append("&nbsp;" + '\n')
-lines.append('\n')
-lines.append("<!-- toc -->" + '\n')
-lines.append('\n')
-lines.append("<!-- tocstop -->" + '\n')
-lines.append('\n')
-lines.append("&nbsp;" + '\n')
-lines.append('\n')
-lines.append('\n')
+lines = [
+    "## Bot Properties" + '\n',
+    '\n',
+    "**These properties can be defined in _botlogin.txt_**" + '\n',
+    '\n',
+    "Docker can also define them as ENV variables by converting to uppercase and adding the _PHANTOMBOT\__ prefix"
+    + '\n',
+    '\n',
+    "NOTE: If the property exists in botlogin.txt, the ENV variable is ignored unless _PHANTOMBOT\_ENVOVERRIDE: \"true\"_ is set"
+    + '\n',
+    '\n',
+    "NOTE: If the property does not list a default value, then the default value is not set/disabled"
+    + '\n',
+    '\n',
+    '\n',
+    "NOTE: _botlogin.txt_ can **not** be edited while the bot is running"
+    + '\n',
+    '\n',
+    "&nbsp;" + '\n',
+    '\n',
+    "<!-- toc -->" + '\n',
+    '\n',
+    "<!-- tocstop -->" + '\n',
+    '\n',
+    "&nbsp;" + '\n',
+    '\n',
+    '\n',
+]
 
 current_category = ""
 for botproperty in sort():
